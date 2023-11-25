@@ -1,0 +1,144 @@
+---
+AWSTemplateFormatVersion: '2019-12-28'
+Description: ''
+Metadata: {}
+Parameters:
+  KeyName:
+    Description: The EC2 Key Pair to allow SSH access to the instances
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+  Creator:
+    Description: Resource Creator
+    Type: String
+    Default: Rakesh
+Mappings: {}
+Conditions: {}
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.11.0.0/16
+      Tags:
+      - Key: Name
+        Value: VPCProj
+      - Key: Creator
+        Value: !Ref Creator
+  Igw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: Igw
+      - Key: Creator
+        Value: !Ref Creator
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref Igw
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "ap-southeast-1a"
+      VpcId: !Ref VPC
+      CidrBlock: 10.11.10.0/24
+      Tags:
+      - Key: Name
+        Value: PublicSubnet
+      - Key: Creator
+        Value: !Ref Creator
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "ap-southeast-1a"
+      VpcId: !Ref VPC
+      CidrBlock: 10.11.20.0/24
+      Tags:
+      - Key: Name
+        Value: PrivateSubnet
+      - Key: Creator
+        Value: !Ref Creator
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: PublicRouteTable
+      - Key: Creator
+        Value: !Ref Creator
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: PrivateRouteTable
+      - Key: Creator
+        Value: !Ref Creator
+  PublicRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+  PrivateRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet
+      RouteTableId: !Ref PrivateRouteTable
+  PublicRouteTableInternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Igw
+  ElasticIP1:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: VPC
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt 'ElasticIP1.AllocationId'
+      SubnetId: !Ref PublicSubnet
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for Inbound and Outbound traffic to allow over SSH Http and Https
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+Outputs:
+  CidrBlock:
+    Description: The set of IP addresses for the VPC.
+    Value: CidrBlock
+  VPC:
+    Description: VPC.
+    Value: !Ref VPC
+  InternetGateway:
+    Description: Internet Gateway to connect with the Internet.
+    Value: !Ref Igw
+  SubnetsPublic:
+    Description: Subnets public.
+    Value: !Ref PublicSubnet
+  SubnetsPrivate:
+    Description: Subnets private.
+    Value: !Ref PrivateSubnet
+  RouteTablesPrivate:
+    Description: Route tables private.
+    Value: !Ref PublicRouteTable
+  RouteTablesPublic:
+    Description: Route tables public.
+    Value: !Ref PrivateRouteTable
